@@ -2,50 +2,42 @@ package com.haotd.inventory.service;
 
 import com.haotd.inventory.dto.Order;
 import com.haotd.inventory.exception.AppException;
-import com.haotd.inventory.repository.InventoryRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class InventoryService {
 
-    private final InventoryRepository inventoryRepository;
+    private static final int TON_KHO_DEMO = 10;
 
     public Order processInventory(Order order) {
-        log.info("Processing inventory for order: {}", order.getOrderId());
-        // Simulate inventory processing logic
-        if (inventoryRepository.checkAvailable(order)) {
-            try {
-                Thread.sleep(3000); // Simulate delay
-                order.setStatus("Inventory reserved");
-                return order;
-            } catch (Exception e) {
-                log.error("Error processing inventory for order: {}", order.getOrderId(), e);
-                order.setStatus("Inventory reservation failed");
-                throw new AppException(order);
-            }
-        } else {
-            log.warn("Insufficient inventory for order: {}", order.getOrderId());
-            order.setStatus("Insufficient inventory");
+        if (!duTonKho(order.getQuantity())) {
+            order.setStatus("Không đủ tồn kho");
+            throw new AppException(order);
+        }
+        try {
+            Thread.sleep(300);
+            order.setStatus("Đã giữ hàng");
+            return order;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            order.setStatus("Giữ hàng thất bại");
             throw new AppException(order);
         }
     }
 
     public Order cancelInventory(Order order) {
-        log.info("Canceling inventory for order: {}", order.getOrderId());
-        // Simulate inventory cancellation logic
         try {
-            Thread.sleep(3000); // Simulate delay
-            order.setStatus("Inventory reservation canceled");
+            Thread.sleep(300);
+            order.setStatus("Đã hủy giữ hàng");
             return order;
-        } catch (Exception e) {
-            log.error("Error canceling inventory for order: {}", order.getOrderId(), e);
-            order.setStatus("Inventory cancellation failed");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            order.setStatus("Hủy giữ hàng thất bại");
             throw new AppException(order);
         }
     }
-}
 
+    private boolean duTonKho(int soLuongDat) {
+        return TON_KHO_DEMO >= soLuongDat;
+    }
+}
