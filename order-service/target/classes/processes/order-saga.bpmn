@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="Definitions_OrderSaga"
+                  targetNamespace="http://haotd.order/camunda"
+                  exporter="Camunda"
+                  exporterVersion="1.0">
+  <bpmn:process id="OrderSaga" name="Order Saga (Camunda)" isExecutable="true">
+    <bpmn:startEvent id="StartEvent_1" name="Start">
+      <bpmn:outgoing>Flow_start_payment</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="Activity_Payment" name="Process Payment"
+                      camunda:delegateExpression="${processPaymentDelegate}">
+      <bpmn:incoming>Flow_start_payment</bpmn:incoming>
+      <bpmn:outgoing>Flow_payment_inventory</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:boundaryEvent id="Boundary_PaymentFailed" name="Payment failed" attachedToRef="Activity_Payment" cancelActivity="true">
+      <bpmn:outgoing>Flow_bp_comppay</bpmn:outgoing>
+      <bpmn:errorEventDefinition camunda:errorCode="PAYMENT_FAILED"/>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Activity_Inventory" name="Reserve Inventory"
+                      camunda:delegateExpression="${processInventoryDelegate}">
+      <bpmn:incoming>Flow_payment_inventory</bpmn:incoming>
+      <bpmn:outgoing>Flow_inventory_shipping</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:boundaryEvent id="Boundary_InventoryFailed" name="Inventory failed" attachedToRef="Activity_Inventory" cancelActivity="true">
+      <bpmn:outgoing>Flow_bi_compinv</bpmn:outgoing>
+      <bpmn:errorEventDefinition camunda:errorCode="INVENTORY_FAILED"/>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Activity_Shipping" name="Ship Order"
+                      camunda:delegateExpression="${processShippingDelegate}">
+      <bpmn:incoming>Flow_inventory_shipping</bpmn:incoming>
+      <bpmn:outgoing>Flow_shipping_success</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:boundaryEvent id="Boundary_ShippingFailed" name="Shipping failed" attachedToRef="Activity_Shipping" cancelActivity="true">
+      <bpmn:outgoing>Flow_bs_compship</bpmn:outgoing>
+      <bpmn:errorEventDefinition camunda:errorCode="SHIPPING_FAILED"/>
+    </bpmn:boundaryEvent>
+
+    <bpmn:serviceTask id="Activity_CompShip" name="Cancel Shipping"
+                      camunda:delegateExpression="${compensateShippingDelegate}">
+      <bpmn:incoming>Flow_bs_compship</bpmn:incoming>
+      <bpmn:outgoing>Flow_compship_compinv</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_CompInv" name="Cancel Inventory"
+                      camunda:delegateExpression="${compensateInventoryDelegate}">
+      <bpmn:incoming>Flow_bi_compinv</bpmn:incoming>
+      <bpmn:incoming>Flow_compship_compinv</bpmn:incoming>
+      <bpmn:outgoing>Flow_compinv_comppay</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_CompPay" name="Cancel Payment"
+                      camunda:delegateExpression="${compensatePaymentDelegate}">
+      <bpmn:incoming>Flow_bp_comppay</bpmn:incoming>
+      <bpmn:incoming>Flow_compinv_comppay</bpmn:incoming>
+      <bpmn:outgoing>Flow_comppay_mark</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="Activity_MarkFailed" name="Mark saga failed"
+                      camunda:delegateExpression="${markSagaFailedDelegate}">
+      <bpmn:incoming>Flow_comppay_mark</bpmn:incoming>
+      <bpmn:outgoing>Flow_mark_endfail</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="End_Success" name="Completed">
+      <bpmn:incoming>Flow_shipping_success</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:endEvent id="End_Failed" name="Failed / compensated">
+      <bpmn:incoming>Flow_mark_endfail</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_start_payment" sourceRef="StartEvent_1" targetRef="Activity_Payment"/>
+    <bpmn:sequenceFlow id="Flow_payment_inventory" sourceRef="Activity_Payment" targetRef="Activity_Inventory"/>
+    <bpmn:sequenceFlow id="Flow_inventory_shipping" sourceRef="Activity_Inventory" targetRef="Activity_Shipping"/>
+    <bpmn:sequenceFlow id="Flow_shipping_success" sourceRef="Activity_Shipping" targetRef="End_Success"/>
+    <bpmn:sequenceFlow id="Flow_bp_comppay" sourceRef="Boundary_PaymentFailed" targetRef="Activity_CompPay"/>
+    <bpmn:sequenceFlow id="Flow_bi_compinv" sourceRef="Boundary_InventoryFailed" targetRef="Activity_CompInv"/>
+    <bpmn:sequenceFlow id="Flow_bs_compship" sourceRef="Boundary_ShippingFailed" targetRef="Activity_CompShip"/>
+    <bpmn:sequenceFlow id="Flow_compship_compinv" sourceRef="Activity_CompShip" targetRef="Activity_CompInv"/>
+    <bpmn:sequenceFlow id="Flow_compinv_comppay" sourceRef="Activity_CompInv" targetRef="Activity_CompPay"/>
+    <bpmn:sequenceFlow id="Flow_comppay_mark" sourceRef="Activity_CompPay" targetRef="Activity_MarkFailed"/>
+    <bpmn:sequenceFlow id="Flow_mark_endfail" sourceRef="Activity_MarkFailed" targetRef="End_Failed"/>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="OrderSaga">
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <dc:Bounds x="152" y="102" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Payment_di" bpmnElement="Activity_Payment">
+        <dc:Bounds x="240" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Inventory_di" bpmnElement="Activity_Inventory">
+        <dc:Bounds x="390" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_Shipping_di" bpmnElement="Activity_Shipping">
+        <dc:Bounds x="540" y="80" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Success_di" bpmnElement="End_Success">
+        <dc:Bounds x="692" y="102" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CompShip_di" bpmnElement="Activity_CompShip">
+        <dc:Bounds x="540" y="220" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CompInv_di" bpmnElement="Activity_CompInv">
+        <dc:Bounds x="390" y="220" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CompPay_di" bpmnElement="Activity_CompPay">
+        <dc:Bounds x="240" y="220" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_MarkFailed_di" bpmnElement="Activity_MarkFailed">
+        <dc:Bounds x="90" y="220" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_Failed_di" bpmnElement="End_Failed">
+        <dc:Bounds x="52" y="352" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_PaymentFailed_di" bpmnElement="Boundary_PaymentFailed">
+        <dc:Bounds x="322" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_InventoryFailed_di" bpmnElement="Boundary_InventoryFailed">
+        <dc:Bounds x="472" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_ShippingFailed_di" bpmnElement="Boundary_ShippingFailed">
+        <dc:Bounds x="622" y="142" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

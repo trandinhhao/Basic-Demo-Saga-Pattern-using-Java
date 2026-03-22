@@ -1,38 +1,32 @@
 package com.haotd.shipping.service;
 
 import com.haotd.shipping.dto.Order;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 @Service
-@Slf4j
 public class ShippingService {
 
     public Order processShipping(Order order) {
-        log.info("[ShippingService] Processing shipping for order: {}", order);
-        // Simulate shipping processing logic
         try {
-            Thread.sleep(3000); // Simulate delay
-            order.setStatus("Shipping scheduled");
+            Thread.sleep(300);
+            order.setStatus("Đã lên lịch giao hàng");
             return order;
-        } catch (Exception e) {
-            log.error("[ShippingService] Error processing shipping for order: {}", order, e);
-            order.setStatus("Shipping failed");
-            return order;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            order.setStatus("Giao hàng thất bại");
+            throw new IllegalStateException("Lỗi xử lý giao hàng: " + e.getMessage(), e);
         }
     }
 
     public Order cancelShipping(Order order) {
-        log.info("[ShippingService] Canceling shipping for order: {}", order);
-        // Simulate shipping cancellation logic
         try {
-            Thread.sleep(3000); // Simulate delay
-            order.setStatus("Shipping canceled");
+            Thread.sleep(300);
+            order.setStatus("Đã hủy giao hàng");
             return order;
-        } catch (Exception e) {
-            log.error("[ShippingService] Error canceling shipping for order: {}", order, e);
-            order.setStatus("Shipping cancellation failed");
-            return order;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            order.setStatus("Hủy giao hàng thất bại");
+            throw new IllegalStateException("Lỗi hủy giao hàng: " + e.getMessage(), e);
         }
     }
 }

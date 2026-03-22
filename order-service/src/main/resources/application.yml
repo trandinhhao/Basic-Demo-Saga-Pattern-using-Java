@@ -4,3 +4,33 @@ server:
 spring:
   application:
     name: order-service
+  datasource:
+    # Ghép các biến DB_HOST, DB_PORT, DB_DATABASE từ .env lại với nhau
+    # Lưu ý: Supabase thường yêu cầu sslmode=require để kết nối từ bên ngoài
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_DATABASE}?sslmode=require
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          lob:
+            non_contextual_creation: true
+        default_schema: public
+
+camunda:
+  bpm:
+    admin-user:
+      id: demo
+      password: demo
+    database:
+      schema-update: true
+    job-execution:
+      enabled: true
+    generic-properties:
+      properties:
+        historyTimeToLive: 30
